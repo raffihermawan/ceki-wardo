@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>CEKI WARDO</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            'primary': '#3b82f6',
+            'primary-hover': '#2563eb',
+            'danger': '#ef4444',
+            'danger-hover': '#dc2626',
+            'success': '#10b981',
+            'success-hover': '#059669',
+            'purple': '#8b5cf6',
+            'purple-hover': '#7c3aed'
+          }
+        }
+      }
+    };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-black dark:text-white min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 font-sans">
+  <div class="w-full max-w-3xl bg-white dark:bg-gray-800 rounded-xl shadow p-4 sm:p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-2xl font-bold text-center w-full">CEKI WARDO FAM'S</h1>
+      <button id="toggleTheme" class="absolute top-4 right-4 bg-gray-300 dark:bg-gray-700 text-sm px-3 py-1 rounded hover:bg-gray-400 dark:hover:bg-gray-600 transition">🌓</button>
+    </div>
+
+    <!-- Input nama pemain -->
+    <div id="setup" class="mb-4">
+      <label class="block mb-2 text-sm">masukin nama lu tot!!! (2-4 orang):</label>
+      <div id="players-inputs" class="space-y-2">
+        <input type="text" placeholder="Pemain 1" class="p-3 border rounded w-full text-base bg-white dark:bg-gray-700 dark:text-white" />
+        <input type="text" placeholder="Pemain 2" class="p-3 border rounded w-full text-base bg-white dark:bg-gray-700 dark:text-white" />
+      </div>
+      <div class="flex flex-col sm:flex-row gap-3 mt-3">
+        <button id="addPlayerBtn" class="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded text-base w-full sm:w-auto transition">+ Pemain</button>
+        <button id="startGameBtn" class="bg-success hover:bg-success-hover text-white px-4 py-2 rounded text-base w-full sm:w-auto transition">Mulai</button>
+      </div>
+    </div>
+
+    <!-- Permainan -->
+    <div id="game" class="hidden">
+      <h2 class="text-xl font-semibold mb-3">Point Pemain</h2>
+      <ul id="scoreboard" class="mb-4 space-y-4"></ul>
+
+      <h3 class="text-lg font-semibold mb-2">Track Record</h3>
+      <div class="overflow-x-auto">
+        <table class="table-auto w-full text-sm text-left border border-gray-300 dark:border-gray-700" id="track-record-table">
+          <thead>
+            <tr class="bg-gray-200 dark:bg-gray-700">
+              <th class="border px-2 py-2">Nama Pemain</th>
+              <th class="border px-2 py-2">Point Terakhir</th>
+            </tr>
+          </thead>
+          <tbody id="track-record"></tbody>
+        </table>
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-3 mt-4 flex-wrap">
+        <button id="resetPointsBtn" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded text-base w-full sm:w-auto transition">Reset Poin</button>
+        <button id="resetBtn" class="bg-danger hover:bg-danger-hover text-white px-4 py-2 rounded text-base w-full sm:w-auto transition">Reset Game</button>
+        <button id="exportBtn" class="bg-purple hover:bg-purple-hover text-white px-4 py-2 rounded text-base w-full sm:w-auto transition">Export ke PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="text-center text-sm text-gray-500 dark:text-gray-400 mt-6">
+    Create By Apih ON OL
+  </footer>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      let players = [];
+      let scores = {};
+
+      const addPlayerInput = () => {
+        const container = document.getElementById("players-inputs");
+        if (container.children.length < 4) {
+          const input = document.createElement("input");
+          input.type = "text";
+          input.placeholder = `Pemain ${container.children.length + 1}`;
+          input.className = "p-3 border rounded w-full text-base bg-white dark:bg-gray-700 dark:text-white";
+          container.appendChild(input);
+        }
+      };
+
+      const startGame = () => {
+        const inputs = document.querySelectorAll("#players-inputs input");
+        players = Array.from(inputs).map(input => input.value.trim()).filter(name => name !== "");
+        if (players.length < 2) {
+          alert("Minimal 2 pemain diperlukan!");
+          return;
+        }
+        scores = {};
+        players.forEach(name => scores[name] = 0);
+        document.getElementById("setup").classList.add("hidden");
+        document.getElementById("game").classList.remove("hidden");
+        updateUI();
+      };
+
+      const updateUI = () => {
+        const scoreboard = document.getElementById("scoreboard");
+        scoreboard.innerHTML = players.map(p => `
+          <li>
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+              <span class="font-medium text-base">${p}</span>
+              <div class="flex gap-2 w-full sm:w-auto">
+                <input type="number" id="input-${p}" placeholder="Masukkan poin" class="p-2 border rounded w-full max-w-xs text-base bg-white dark:bg-gray-700 dark:text-white" />
+                <button onclick="applyCustomScore('${p}')" class="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded text-base transition">Input Skor</button>
+              </div>
+            </div>
+          </li>`).join("");
+
+        const trackTable = document.getElementById("track-record");
+        trackTable.innerHTML = players.map(p => `
+          <tr>
+            <td class="border px-2 py-2">${p}</td>
+            <td class="border px-2 py-2">${scores[p]}</td>
+          </tr>`).join("");
+      };
+
+      window.applyCustomScore = function(player) {
+        const input = document.getElementById(`input-${player}`);
+        const value = parseInt(input.value, 10);
+        if (!isNaN(value)) {
+          scores[player] += value;
+          updateUI();
+          input.value = "";
+        }
+      };
+
+      const resetGame = () => {
+        if (confirm("yakin lu mau di reset?") ) {
+          players = [];
+          scores = {};
+          document.getElementById("setup").classList.remove("hidden");
+          document.getElementById("game").classList.add("hidden");
+          document.getElementById("players-inputs").innerHTML = `
+            <input type="text" placeholder="Pemain 1" class="p-3 border rounded w-full text-base bg-white dark:bg-gray-700 dark:text-white" />
+            <input type="text" placeholder="Pemain 2" class="p-3 border rounded w-full text-base bg-white dark:bg-gray-700 dark:text-white" />
+          `;
+        }
+      };
+
+      const resetPoints = () => {
+        if (confirm("yakin mau reset jadi 0? (CUPU HAHAH!!)")) {
+          players.forEach(p => scores[p] = 0);
+          updateUI();
+        }
+      };
+
+      const exportPDF = async () => {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.text("Track Record Skor Ceki", 14, 16);
+        const headers = [["Nama Pemain", "Skor Terakhir"]];
+        const data = players.map(p => [p, scores[p]]);
+        doc.autoTable({ startY: 20, head: headers, body: data });
+        doc.save("skor-ceki.pdf");
+      };
+
+      document.getElementById("addPlayerBtn").addEventListener("click", addPlayerInput);
+      document.getElementById("startGameBtn").addEventListener("click", startGame);
+      document.getElementById("resetBtn").addEventListener("click", resetGame);
+      document.getElementById("resetPointsBtn").addEventListener("click", resetPoints);
+      document.getElementById("exportBtn").addEventListener("click", exportPDF);
+
+      document.getElementById("toggleTheme").addEventListener("click", () => {
+        document.documentElement.classList.toggle('dark');
+      });
+    });
+  </script>
+</body>
+</html>
